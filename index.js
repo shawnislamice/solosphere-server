@@ -150,7 +150,16 @@ async function run() {
     });
     app.post("/bidjobs", verifyToken, async (req, res) => {
       const bidJob = req.body;
+      // Check is it duplicate
+      const alreadyApplied = await bidJobsCollection.findOne({
+        email: bidJob.email,
+        title: bidJob.title,
+      });
+      if (alreadyApplied) {
+        return res.status(400).send("You have already placed on this job");
+      }
       const result = await bidJobsCollection.insertOne(bidJob);
+
       res.send(result);
     });
     app.get("/bidjobs/:email", verifyToken, async (req, res) => {
@@ -183,6 +192,47 @@ async function run() {
         $set: status,
       };
       const result = await bidJobsCollection.updateOne(query, updatedDoc);
+      res.send(result);
+    });
+
+    // Find Total; Data Coutn
+    app.get("/alljobscount", async (req, res) => {
+      const filter = req.query.filter;
+      let query = {};
+      if (filter) {
+        query = {
+          category: filter,
+        };
+      }
+      const result = await jobsCollection.countDocuments();
+      res.send({ result });
+    });
+    app.get("/newalljobs", async (req, res) => {
+      const size = parseInt(req.query.size);
+      const page = parseInt(req.query.page) - 1;
+      const filter = req.query.filter;
+      const sort = req.query.sort;
+      let options = {};
+      let query = {};
+
+      if (sort) {
+        options = {
+          sort: { deadline: sort === "asc" ? 1 : -1 },
+        };
+      }
+
+      if (filter) {
+        query = {
+          category: filter,
+        };
+      }
+
+      console.log(size, page);
+      const result = await jobsCollection
+        .find(query,options)
+        .skip(page * size)
+        .limit(size)
+        .toArray();
       res.send(result);
     });
     // Send a ping to confirm a successful connection
